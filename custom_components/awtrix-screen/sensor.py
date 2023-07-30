@@ -71,8 +71,11 @@ class CustomScreenSensor(Entity):
         """Fetch new state data for the sensor."""
         try:
             response = requests.get(self._api_endpoint, timeout=5)
+            _LOGGER.debug("status code: %s", response.status_code)
             if response.status_code == 200:
+                _LOGGER.debug("Gone trough if loop")
                 data = response.json()
+                _LOGGER.debug("DATA: %s", data)
                 if isinstance(data, list):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
                     self._attributes["screen"] = json.dumps(data)
