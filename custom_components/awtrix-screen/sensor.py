@@ -83,7 +83,7 @@ class CustomScreenSensor(Entity):
         # Update the test attribute to always be "test"
         self._attributes["test"] = "test"
 
-    def extra_state_attributes(self):
+    async def extra_state_attributes(self):
         """Return the state attributes."""
-        return self._attributes  # Removed the parenthesis here
+        return self._attributes
 
