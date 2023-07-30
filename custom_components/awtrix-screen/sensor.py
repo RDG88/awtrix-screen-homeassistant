@@ -81,3 +81,6 @@ class CustomScreenSensor(Entity):
                 _LOGGER.warning("Request to API failed with status code: %s", response.status_code)
         except requests.exceptions.RequestException as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
+
+        # Convert data to JSON-formatted string and store it in the "screen" attribute
+        self._attributes["screen"] = self._state.json()
