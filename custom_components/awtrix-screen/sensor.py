@@ -1,5 +1,5 @@
 import logging
-import aiohttp
+import requests
 import voluptuous as vol
 from datetime import timedelta
 import json
@@ -8,7 +8,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import CONF_NAME, CONF_URL
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +30,16 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     name = config[CONF_NAME]
 
     sensors = [CustomScreenSensor(name, api_endpoint)]
+
     add_entities(sensors)
+
+    def update_sensors(event_time):
+        """Update all the sensors."""
+        for sensor in sensors:
+            sensor.update()
+
+    # Schedule the update function based on the scan_interval
+    track_time_interval(hass, update_sensors, SCAN_INTERVAL)
 
 
 class CustomScreenSensor(Entity):
@@ -41,7 +50,7 @@ class CustomScreenSensor(Entity):
         self._name = name
         self._api_endpoint = api_endpoint
         self._state = 1
-        self._attributes = {"test": "test"}
+        self._attributes = {}
 
     @property
     def name(self):
@@ -58,31 +67,23 @@ class CustomScreenSensor(Entity):
         """Return the state attributes."""
         return self._attributes
 
-    async def async_added_to_hass(self):
-        """Call when entity about to be added to Home Assistant."""
-        await self.async_update()
-
-        # Schedule regular updates
-        async_track_time_interval(self.hass, self.async_update, SCAN_INTERVAL)
-
-    async def async_update(self, _=None):
+    def update(self):
         """Fetch new state data for the sensor."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self._api_endpoint, timeout=5) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        if isinstance(data, list):
-                            # Convert data to JSON-formatted string and store it in the "screen" attribute
-                            self._attributes["screen"] = json.dumps(data)
-                            # Log the received data
-                            _LOGGER.debug("Received data from API: %s", data)
-                        else:
-                            _LOGGER.warning("Invalid data format received from API.")
-                    else:
-                        _LOGGER.warning("Request to API failed with status code: %s", response.status)
-        except aiohttp.ClientError as e:
+            response = requests.get(self._api_endpoint, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, list):
+                    # Convert data to JSON-formatted string and store it in the "screen" attribute
+                    self._attributes["screen"] = json.dumps(data)
+                    # Log the received data
+                    _LOGGER.debug("Received data from API: %s", data)
+                else:
+                    _LOGGER.warning("Invalid data format received from API.")
+            else:
+                _LOGGER.warning("Request to API failed with status code: %s", response.status_code)
+        except requests.exceptions.RequestException as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
 
-        # Update the test attribute to always be "test"
+        # Add a "test" attribute and set its value to "test"
         self._attributes["test"] = "test"
