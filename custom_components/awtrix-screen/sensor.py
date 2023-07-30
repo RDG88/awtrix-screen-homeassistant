@@ -85,4 +85,5 @@ class CustomScreenSensor(Entity):
 
     def extra_state_attributes(self):
         """Return the state attributes."""
-        return self._attributes
+        return self._attributes  # Removed the parenthesis here
+
