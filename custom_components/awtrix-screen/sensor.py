@@ -5,7 +5,7 @@ import requests
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import CONF_URL
+from homeassistant.const import (CONF_NAME, CONF_URL, CONF_SCAN_INTERVAL)
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import track_time_interval
