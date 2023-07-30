@@ -76,6 +76,8 @@ class CustomScreenSensor(Entity):
                 if isinstance(data, list):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
                     self._attributes["screen"] = json.dumps(data)
+                    # Log the received data
+                    _LOGGER.debug("Received data from API: %s", data)
                 else:
                     _LOGGER.warning("Invalid data format received from API.")
             else:
