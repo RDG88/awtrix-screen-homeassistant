@@ -1,7 +1,8 @@
 import logging
-
 import requests
 import voluptuous as vol
+from datetime import timedelta
+
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import CONF_NAME, CONF_URL
@@ -11,6 +12,8 @@ from homeassistant.helpers.event import track_time_interval
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_NAME = "Custom Screen Sensor"
+
+SCAN_INTERVAL = timedelta(seconds=5)
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -35,7 +38,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             sensor.update()
 
     # Schedule the update function based on the scan_interval
-    track_time_interval(hass, update_sensors, interval=5)  # Adjust the interval as needed
+    track_time_interval(hass, update_sensors, interval=SCAN_INTERVAL.seconds)
 
 
 class CustomScreenSensor(Entity):
