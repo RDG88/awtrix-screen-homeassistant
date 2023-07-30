@@ -2,6 +2,7 @@ import logging
 import requests
 import voluptuous as vol
 from datetime import timedelta
+import json
 
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -48,7 +49,7 @@ class CustomScreenSensor(Entity):
         """Initialize the sensor."""
         self._name = name
         self._api_endpoint = api_endpoint
-        self._state = None
+        self._state = 1
         self._attributes = {}
 
     @property
@@ -73,14 +74,14 @@ class CustomScreenSensor(Entity):
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list):
-                    self._state = data[0]
-                    self._attributes["screen"] = data  # Store the entire data list as the "screen" attribute
-
-                    # Log the received data
-                    _LOGGER.debug("Received data from API: %s", data)
+                    # Convert data to JSON-formatted string and store it in the "screen" attribute
+                    self._attributes["screen"] = json.dumps(data)
                 else:
                     _LOGGER.warning("Invalid data format received from API.")
             else:
                 _LOGGER.warning("Request to API failed with status code: %s", response.status_code)
         except requests.exceptions.RequestException as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
+
+        # Add a "test" attribute and set its value to "test"
+        self._attributes["test"] = "test"
