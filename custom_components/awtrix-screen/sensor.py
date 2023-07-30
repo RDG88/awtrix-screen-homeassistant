@@ -62,6 +62,11 @@ class CustomScreenSensor(Entity):
         """Return the state of the sensor."""
         return self._state
 
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return self._attributes
+
     def update(self):
         """Fetch new state data for the sensor."""
         try:
@@ -82,8 +87,3 @@ class CustomScreenSensor(Entity):
 
         # Update the test attribute to always be "test"
         self._attributes["test"] = "test"
-
-    async def extra_state_attributes(self):
-        """Return the state attributes."""
-        return self._attributes
-
