@@ -30,16 +30,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     name = config[CONF_NAME]
 
     sensors = [CustomScreenSensor(name, api_endpoint)]
-
     add_entities(sensors)
-
-    def update_sensors(event_time):
-        """Update all the sensors."""
-        for sensor in sensors:
-            sensor.update()
-
-    # Schedule the update function based on the scan_interval
-    track_time_interval(hass, update_sensors, SCAN_INTERVAL)
 
 
 class CustomScreenSensor(Entity):
@@ -67,7 +58,11 @@ class CustomScreenSensor(Entity):
         """Return the state attributes."""
         return self._attributes
 
-    def update(self):
+    async def async_added_to_hass(self):
+        """Call when entity about to be added to Home Assistant."""
+        await self.async_update()
+
+    async def async_update(self):
         """Fetch new state data for the sensor."""
         try:
             response = requests.get(self._api_endpoint, timeout=5)
