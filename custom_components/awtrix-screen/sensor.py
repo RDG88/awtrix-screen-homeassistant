@@ -1,5 +1,5 @@
 import logging
-import requests
+import aiohttp
 import voluptuous as vol
 from datetime import timedelta
 import json
@@ -8,7 +8,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import CONF_NAME, CONF_URL
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import track_time_interval
+from homeassistant.helpers.event import async_track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,19 +65,20 @@ class CustomScreenSensor(Entity):
     async def async_update(self):
         """Fetch new state data for the sensor."""
         try:
-            response = requests.get(self._api_endpoint, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    # Convert data to JSON-formatted string and store it in the "screen" attribute
-                    self._attributes["screen"] = json.dumps(data)
-                    # Log the received data
-                    _LOGGER.debug("Received data from API: %s", data)
-                else:
-                    _LOGGER.warning("Invalid data format received from API.")
-            else:
-                _LOGGER.warning("Request to API failed with status code: %s", response.status_code)
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self._api_endpoint, timeout=5) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if isinstance(data, list):
+                            # Convert data to JSON-formatted string and store it in the "screen" attribute
+                            self._attributes["screen"] = json.dumps(data)
+                            # Log the received data
+                            _LOGGER.debug("Received data from API: %s", data)
+                        else:
+                            _LOGGER.warning("Invalid data format received from API.")
+                    else:
+                        _LOGGER.warning("Request to API failed with status code: %s", response.status)
+        except aiohttp.ClientError as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
 
         # Update the test attribute to always be "test"
