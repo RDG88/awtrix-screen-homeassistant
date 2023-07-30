@@ -1,18 +1,14 @@
 import logging
-from datetime import timedelta
 
 import requests
-import voluptuous as vol  # Ensure vol is imported before references to CONF_NAME
-
-from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import (CONF_NAME, CONF_URL, CONF_SCAN_INTERVAL)
+import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
+from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.const import CONF_NAME, CONF_URL
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
-
-SCAN_INTERVAL = timedelta(seconds=5)  # Adjust the interval as needed
 
 DEFAULT_NAME = "Custom Screen Sensor"
 
@@ -20,7 +16,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_URL): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-        vol.Optional("scan_interval", default=5): cv.positive_int,
     }
 )
 
@@ -29,9 +24,8 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the custom sensor platform."""
     api_endpoint = config[CONF_URL]
     name = config[CONF_NAME]
-    scan_interval = timedelta(seconds=config["scan_interval"])
 
-    sensors = [CustomScreenSensor(name, api_endpoint, scan_interval)]
+    sensors = [CustomScreenSensor(name, api_endpoint)]
 
     add_entities(sensors)
 
@@ -41,19 +35,18 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             sensor.update()
 
     # Schedule the update function based on the scan_interval
-    track_time_interval(hass, update_sensors, scan_interval)
+    track_time_interval(hass, update_sensors, interval=5)  # Adjust the interval as needed
 
 
 class CustomScreenSensor(Entity):
     """Representation of a Custom Screen Sensor."""
 
-    def __init__(self, name, api_endpoint, scan_interval):
+    def __init__(self, name, api_endpoint):
         """Initialize the sensor."""
         self._name = name
         self._api_endpoint = api_endpoint
         self._state = None
         self._attributes = {}
-        self._scan_interval = scan_interval
 
     @property
     def name(self):
