@@ -5,31 +5,30 @@ import requests
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import CONF_API_ENDPOINT, CONF_NAME
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
 
-DEFAULT_SCAN_INTERVAL = 5  # Default scan interval in seconds
+SCAN_INTERVAL = timedelta(seconds=5)  # Adjust the interval as needed
 
 DEFAULT_NAME = "Custom Screen Sensor"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Required(CONF_API_ENDPOINT): cv.string,
+        vol.Required("api_endpoint"): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-        vol.Optional("scan_interval", default=DEFAULT_SCAN_INTERVAL): cv.positive_int,
+        vol.Optional("scan_interval", default=5): cv.positive_int,
     }
 )
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the custom sensor platform."""
-    api_endpoint = config.get(CONF_API_ENDPOINT)
-    name = config.get(CONF_NAME)
-    scan_interval = timedelta(seconds=config.get("scan_interval"))
+    api_endpoint = config["api_endpoint"]
+    name = config[CONF_NAME]
+    scan_interval = timedelta(seconds=config["scan_interval"])
 
     sensors = [CustomScreenSensor(name, api_endpoint, scan_interval)]
 
