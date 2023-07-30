@@ -62,7 +62,10 @@ class CustomScreenSensor(Entity):
         """Call when entity about to be added to Home Assistant."""
         await self.async_update()
 
-    async def async_update(self):
+        # Schedule regular updates
+        async_track_time_interval(self.hass, self.async_update, SCAN_INTERVAL)
+
+    async def async_update(self, _=None):
         """Fetch new state data for the sensor."""
         try:
             async with aiohttp.ClientSession() as session:
