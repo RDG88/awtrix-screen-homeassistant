@@ -1,16 +1,15 @@
 import logging
 import os
-import requests
 import voluptuous as vol
 from datetime import timedelta, datetime
 import json
-from requests.exceptions import RequestException, ConnectTimeout, ConnectionError
+import aiohttp
+import asyncio
 
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
-from homeassistant.const import CONF_NAME, CONF_URL, CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_NAME, CONF_URL
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import track_time_interval, call_later
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,42 +48,62 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
+async def async_http_get(session, url):
+    try:
+        async with session.get(url, timeout=5) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                _LOGGER.warning(
+                    "Request to API failed with status code: %s", response.status
+                )
+                return None
+    except aiohttp.ClientError as e:
+        _LOGGER.warning("Error fetching data from API: %s", e)
+        return None
+
+
+async def async_http_check_online(api_endpoint):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_endpoint, timeout=5) as response:
+                return response.status == 200
+    except aiohttp.ClientError as e:
+        _LOGGER.warning("Error fetching data from API: %s", e)
+        return False
+
+
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the custom sensor platform."""
     api_endpoint = config[CONF_URL]
     name = config[CONF_NAME]
-    scan_interval = config.get(
-        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-    )  # Corrected indentation
+    scan_interval = config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     sensors = [CustomScreenSensor(name, api_endpoint, scan_interval)]
 
     add_entities(sensors)
 
-    def update_sensors(event_time):
+    async def async_update_sensors(event_time):
         """Update all the sensors."""
         for sensor in sensors:
-            sensor.update()
+            await sensor.async_update()
 
-    def check_online_status(now):
+    async def async_check_online_status(now):
         """Check if the device is online."""
-        try:
-            response = requests.get(api_endpoint, timeout=5)
-            online = response.status_code == 200
-        except RequestException as e:
-            _LOGGER.warning("Error fetching data from API: %s", e)
-            online = False
+        online = await async_http_check_online(api_endpoint)
 
         for sensor in sensors:
             # Check if the online status has changed since the last check
             if sensor.is_online() != online:
-                sensor.update_online_status(online)
+                await sensor.async_update_online_status(online)
 
     # Perform the initial online status check after a small delay when Home Assistant starts
-    call_later(hass, 5, check_online_status)
+    hass.async_create_task(async_check_online_status(None))
 
     # Schedule the regular update function and online status check based on the scan_interval
-    track_time_interval(hass, update_sensors, scan_interval)
-    track_time_interval(hass, check_online_status, ONLINE_CHECK_INTERVAL)
+    hass.async_create_task(async_update_sensors(None))
+    hass.helpers.event.async_track_time_interval(
+        async_check_online_status, ONLINE_CHECK_INTERVAL
+    )
 
 
 class CustomScreenSensor(Entity):
@@ -121,7 +140,7 @@ class CustomScreenSensor(Entity):
         """Return the current online status."""
         return self._online
 
-    def update_online_status(self, online):
+    async def async_update_online_status(self, online):
         """Update the online status."""
         if not online:
             self._error_counter += 1
@@ -130,8 +149,8 @@ class CustomScreenSensor(Entity):
                 self._online = False
                 self._state = 0
                 # Trigger an online status check after the offline check delay
-                self._offline_delay = call_later(
-                    self.hass, OFFLINE_CHECK_DELAY.total_seconds(), self.check_online
+                self._offline_delay = asyncio.get_event_loop().call_later(
+                    OFFLINE_CHECK_DELAY.total_seconds(), self.async_check_online
                 )
         else:
             if not self._online:
@@ -141,32 +160,25 @@ class CustomScreenSensor(Entity):
                 self._state = None
                 # Cancel any previously scheduled online status check
                 if self._offline_delay is not None:
-                    self._offline_delay()
+                    self._offline_delay.cancel()
                     self._offline_delay = None
 
-    def check_online(self, *args):
+    async def async_check_online(self, *args):
         """Check if the device is online after the delay."""
         _LOGGER.warning("Checking if AWTRIX is online: %s", self._name)
-        try:
-            response = requests.get(self._api_endpoint, timeout=5)
-            online = response.status_code == 200
-        except RequestException as e:
-            _LOGGER.warning("Error fetching data from API: %s", e)
-            online = False
+        online = await async_http_check_online(self._api_endpoint)
+        await self.async_update_online_status(online)
 
-        self.update_online_status(online)
-
-    def update(self):
+    async def async_update(self):
         """Fetch new state data for the sensor if the device is online."""
         if not self._online:
             # If the device is offline, set the "screen" attribute with the offline data
             self._state_attributes["screen"] = json.dumps(ALL_SCREEN_DATA["offline"])
             return
 
-        try:
-            response = requests.get(self._api_endpoint, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
+        async with aiohttp.ClientSession() as session:
+            data = await async_http_get(session, self._api_endpoint)
+            if data is not None:
                 if isinstance(data, list):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
                     self._state_attributes["screen"] = json.dumps(data)
@@ -180,19 +192,7 @@ class CustomScreenSensor(Entity):
                     _LOGGER.warning("Invalid data format received from API.")
                     self._handle_error()
             else:
-                _LOGGER.warning(
-                    "Request to API failed with status code: %s", response.status_code
-                )
                 self._handle_error()
-        except ConnectTimeout as e:
-            _LOGGER.warning("Timeout while fetching data from API: %s", e)
-            self._handle_error()
-        except ConnectionError as e:
-            _LOGGER.warning("Connection error while fetching data from API: %s", e)
-            self._handle_error()
-        except RequestException as e:
-            _LOGGER.warning("Other request error while fetching data from API: %s", e)
-            self._handle_error()
 
         # Add a "test" attribute and set its value to "test"
         self._state_attributes["test"] = "test"
@@ -205,6 +205,6 @@ class CustomScreenSensor(Entity):
             self._online = False
             self._state = 0
             # Trigger an online status check after the offline check delay
-            self._offline_delay = call_later(
-                self.hass, OFFLINE_CHECK_DELAY.total_seconds(), self.check_online
+            self._offline_delay = asyncio.get_event_loop().call_later(
+                OFFLINE_CHECK_DELAY.total_seconds(), self.async_check_online
             )
