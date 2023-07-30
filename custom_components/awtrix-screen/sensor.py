@@ -126,7 +126,7 @@ class CustomScreenSensor(Entity):
         if not online:
             self._error_counter += 1
             if self._error_counter >= self._max_errors:
-                _LOGGER.warning("Device is offline: %s", self._name)
+                _LOGGER.warning("AWTRIX is offline: %s", self._name)
                 self._online = False
                 self._state = 0
                 # Trigger an online status check after the offline check delay
@@ -135,7 +135,7 @@ class CustomScreenSensor(Entity):
                 )
         else:
             if not self._online:
-                _LOGGER.warning("Device is back online: %s", self._name)
+                _LOGGER.warning("AWTRIX is online: %s", self._name)
                 self._online = True
                 # Set the state to None to trigger an update on the next scheduled interval
                 self._state = None
@@ -146,7 +146,7 @@ class CustomScreenSensor(Entity):
 
     def check_online(self, *args):
         """Check if the device is online after the delay."""
-        _LOGGER.warning("Checking if device is online: %s", self._name)
+        _LOGGER.warning("Checking if AWTRIX is online: %s", self._name)
         try:
             response = requests.get(self._api_endpoint, timeout=5)
             online = response.status_code == 200
@@ -201,7 +201,7 @@ class CustomScreenSensor(Entity):
         """Handle consecutive errors and set the state to offline if needed."""
         self._error_counter += 1
         if self._error_counter >= self._max_errors:
-            _LOGGER.warning("Device is offline: %s", self._name)
+            _LOGGER.warning("AWTRIX is offline: %s", self._name)
             self._online = False
             self._state = 0
             # Trigger an online status check after the offline check delay
