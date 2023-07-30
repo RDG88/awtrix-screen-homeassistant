@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 import requests
-import voluptuous as vol
+import voluptuous as vol  # Ensure vol is imported before references to CONF_NAME
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (CONF_NAME, CONF_URL, CONF_SCAN_INTERVAL)
