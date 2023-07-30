@@ -50,7 +50,7 @@ class CustomScreenSensor(Entity):
         self._name = name
         self._api_endpoint = api_endpoint
         self._state = 1
-        self._attributes = {}
+        self._state_attributes = {}
 
     @property
     def name(self):
@@ -65,7 +65,7 @@ class CustomScreenSensor(Entity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-        return self._attributes
+        return self._state_attributes
 
     def update(self):
         """Fetch new state data for the sensor."""
@@ -75,7 +75,7 @@ class CustomScreenSensor(Entity):
                 data = response.json()
                 if isinstance(data, list):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
-                    self._attributes["screen"] = json.dumps(data)
+                    self._states_attributes["screen"] = json.dumps(data)
                     # Log the received data
                     _LOGGER.debug("Received data from API: %s", data)
                 else:
@@ -86,4 +86,4 @@ class CustomScreenSensor(Entity):
             _LOGGER.warning("Error fetching data from API: %s", e)
 
         # Add a "test" attribute and set its value to "test"
-        self._attributes["test"] = "test"
+        self._state_attributes["test"] = "test"
