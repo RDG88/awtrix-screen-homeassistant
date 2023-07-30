@@ -17,8 +17,6 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_NAME = "Custom Screen Sensor"
 
 CONF_SCAN_INTERVAL = "scan_interval"
-CONF_CONNECTION_TIMEOUT = "connection_timeout"
-CONF_READ_TIMEOUT = "read_timeout"
 LIVE_SCAN_INTERVAL = timedelta(seconds=1)
 SCAN_INTERVAL = timedelta(seconds=1)
 DEFAULT_SCAN_INTERVAL = LIVE_SCAN_INTERVAL.seconds
@@ -47,8 +45,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Required(CONF_URL): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): cv.time_period,
-        vol.Optional(CONF_CONNECTION_TIMEOUT, default=10): cv.positive_int,
-        vol.Optional(CONF_READ_TIMEOUT, default=10): cv.positive_int,
     }
 )
 
@@ -60,10 +56,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     scan_interval = config.get(
         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
     )  # Corrected indentation
-    connection_timeout = config.get(CONF_CONNECTION_TIMEOUT, 10)
-    read_timeout = config.get(CONF_READ_TIMEOUT, 10)
-
-    sensors = [CustomScreenSensor(name, api_endpoint, scan_interval, connection_timeout, read_timeout)]
+    sensors = [CustomScreenSensor(name, api_endpoint, scan_interval)]
 
     add_entities(sensors)
 
@@ -75,7 +68,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     def check_online_status(now):
         """Check if the device is online."""
         try:
-            response = requests.get(api_endpoint, timeout=(connection_timeout, read_timeout))
+            response = requests.get(api_endpoint, timeout=5)
             online = response.status_code == 200
         except RequestException as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
@@ -97,7 +90,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class CustomScreenSensor(Entity):
     """Representation of a Custom Screen Sensor."""
 
-    def __init__(self, name, api_endpoint, scan_interval, connection_timeout, read_timeout):
+    def __init__(self, name, api_endpoint, scan_interval):
         """Initialize the sensor."""
         self._name = name
         self._api_endpoint = api_endpoint
@@ -108,8 +101,6 @@ class CustomScreenSensor(Entity):
         self._max_errors = 3  # Maximum consecutive errors before reporting offline
         self._error_counter = 0
         self._offline_delay = None
-        self._connection_timeout = connection_timeout
-        self._read_timeout = read_timeout
 
     @property
     def name(self):
@@ -129,17 +120,6 @@ class CustomScreenSensor(Entity):
     def is_online(self):
         """Return the current online status."""
         return self._online
-
-    def check_online(self, *args):
-        """Check if the device is online after the delay."""
-        _LOGGER.warning("Checking if AWTRIX is online: %s", self._name)
-        try:
-            response = requests.get(self._api_endpoint, timeout=(self._connection_timeout, self._read_timeout))
-            online = response.status_code == 200
-            self.update_online_status(online)
-        except (RequestException, ConnectTimeout, ConnectionError) as e:
-            _LOGGER.warning("Error fetching data from API: %s", e)
-            self._handle_error()
 
     def update_online_status(self, online):
         """Update the online status."""
@@ -164,6 +144,18 @@ class CustomScreenSensor(Entity):
                     self._offline_delay()
                     self._offline_delay = None
 
+    def check_online(self, *args):
+        """Check if the device is online after the delay."""
+        _LOGGER.warning("Checking if AWTRIX is online: %s", self._name)
+        try:
+            response = requests.get(self._api_endpoint, timeout=5)
+            online = response.status_code == 200
+        except RequestException as e:
+            _LOGGER.warning("Error fetching data from API: %s", e)
+            online = False
+
+        self.update_online_status(online)
+
     def update(self):
         """Fetch new state data for the sensor if the device is online."""
         if not self._online:
@@ -172,7 +164,7 @@ class CustomScreenSensor(Entity):
             return
 
         try:
-            response = requests.get(self._api_endpoint, timeout=(self._connection_timeout, self._read_timeout))
+            response = requests.get(self._api_endpoint, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 if isinstance(data, list):
@@ -192,9 +184,18 @@ class CustomScreenSensor(Entity):
                     "Request to API failed with status code: %s", response.status_code
                 )
                 self._handle_error()
-        except (RequestException, ConnectTimeout, ConnectionError) as e:
-            _LOGGER.warning("Error fetching data from API: %s", e)
+        except ConnectTimeout as e:
+            _LOGGER.warning("Timeout while fetching data from API: %s", e)
             self._handle_error()
+        except ConnectionError as e:
+            _LOGGER.warning("Connection error while fetching data from API: %s", e)
+            self._handle_error()
+        except RequestException as e:
+            _LOGGER.warning("Other request error while fetching data from API: %s", e)
+            self._handle_error()
+
+        # Add a "test" attribute and set its value to "test"
+        self._state_attributes["test"] = "test"
 
     def _handle_error(self):
         """Handle consecutive errors and set the state to offline if needed."""
