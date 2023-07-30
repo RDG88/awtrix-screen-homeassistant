@@ -179,7 +179,7 @@ class CustomScreenSensor(Entity):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
                     self._state_attributes["screen"] = json.dumps(data)
                     # Log the received data
-                    _LOGGER.debug("Received data from API: %s", data)
+                    # _LOGGER.debug("Received data from API: %s", data)
                     # Reset the error counter on a successful API response
                     self._error_counter = 0
                     # Set the state to 1 to indicate the device is online
