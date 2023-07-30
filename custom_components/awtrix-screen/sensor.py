@@ -50,7 +50,7 @@ class CustomScreenSensor(Entity):
         self._name = name
         self._api_endpoint = api_endpoint
         self._state = 1
-        self._attributes = {}
+        self._attributes = {"test": "test"}
 
     @property
     def name(self):
@@ -62,20 +62,12 @@ class CustomScreenSensor(Entity):
         """Return the state of the sensor."""
         return self._state
 
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        return self._attributes
-
     def update(self):
         """Fetch new state data for the sensor."""
         try:
             response = requests.get(self._api_endpoint, timeout=5)
-            _LOGGER.debug("status code: %s", response.status_code)
             if response.status_code == 200:
-                _LOGGER.debug("Gone trough if loop")
                 data = response.json()
-                _LOGGER.debug("DATA: %s", data)
                 if isinstance(data, list):
                     # Convert data to JSON-formatted string and store it in the "screen" attribute
                     self._attributes["screen"] = json.dumps(data)
@@ -88,5 +80,9 @@ class CustomScreenSensor(Entity):
         except requests.exceptions.RequestException as e:
             _LOGGER.warning("Error fetching data from API: %s", e)
 
-        # Add a "test" attribute and set its value to "test"
+        # Update the test attribute to always be "test"
         self._attributes["test"] = "test"
+
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        return self._attributes
